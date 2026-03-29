@@ -29,6 +29,7 @@
         .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; margin-top: 10px; }
         .btn-primary { background: var(--line-green); color: white; }
         .btn-share { background: #3b5998; color: white; }
+        .flow-notice { display: none; margin: 8px 0 2px; font-size: 12px; color: #666; text-align: left; }
     </style>
 </head>
 <body>
@@ -40,6 +41,8 @@
         <div>玩家: <span id="user-name">載入中...</span></div>
         <div>步數: <span id="move-count">0</span></div>
     </div>
+
+    <div class="flow-notice" id="flow-notice"></div>
 
     <div class="game-grid" id="game-grid">
         <!-- 卡牌由 JS 動態生成 -->
@@ -134,14 +137,9 @@
     }
 
     function showFlowNotice(msg) {
-        const node = document.createElement('div');
-        node.style.fontSize = '12px';
-        node.style.color = '#666';
-        node.style.marginTop = '8px';
-        node.innerText = msg;
-        const container = document.querySelector('.container');
-        container.insertBefore(node, container.firstChild.nextSibling);
-        setTimeout(() => node.remove(), 5000);
+        const notice = document.getElementById('flow-notice');
+        notice.innerText = msg;
+        notice.style.display = 'block';
     }
 
     // --- 3. 處理勝利與上傳 ---

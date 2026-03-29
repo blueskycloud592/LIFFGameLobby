@@ -124,6 +124,7 @@
         .btn-primary { background: var(--line-green); color: white; }
         .btn-share   { background: #3b5998; color: white; }
         .btn-lobby   { background: #ecf0f1; color: #555; }
+        .flow-notice { display: none; margin: 8px 0 2px; font-size: 12px; color: #666; text-align: left; }
     </style>
 </head>
 <body>
@@ -135,6 +136,8 @@
         <div>玩家: <span id="user-name">載入中...</span></div>
         <div>分數: <span id="score">0</span></div>
     </div>
+
+    <div class="flow-notice" id="flow-notice"></div>
 
     <div class="canvas-wrapper">
         <canvas id="game-canvas"></canvas>
@@ -232,6 +235,8 @@
         document.getElementById('gameover-overlay').style.display = 'none';
         document.getElementById('leaderboard-section').style.display = 'none';
         document.getElementById('score').innerText = '0';
+        document.getElementById('flow-notice').style.display = 'none';
+        document.getElementById('flow-notice').innerText = '';
 
         snake         = [{ x: 12, y: 10 }, { x: 11, y: 10 }, { x: 10, y: 10 }];
         direction     = { x: 1, y: 0 };
@@ -302,14 +307,9 @@
     }
 
     function showFlowNotice(msg) {
-        const node = document.createElement('div');
-        node.style.fontSize = '12px';
-        node.style.color = '#666';
-        node.style.marginTop = '8px';
-        node.innerText = msg;
-        const container = document.querySelector('.container');
-        container.insertBefore(node, container.firstChild.nextSibling);
-        setTimeout(() => node.remove(), 5000);
+        const notice = document.getElementById('flow-notice');
+        notice.innerText = msg;
+        notice.style.display = 'block';
     }
 
     // ─── Drawing ─────────────────────────────────────────────────────────────
