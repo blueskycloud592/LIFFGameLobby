@@ -42,6 +42,27 @@
             font-weight: bold;
             font-size: 13px;
         }
+        .difficulty-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin: 6px 0 8px;
+        }
+        .difficulty-btn {
+            border: 1px solid #d8e6d8;
+            background: #f7fbf7;
+            border-radius: 10px;
+            padding: 8px 6px;
+            font-size: 13px;
+            color: #466046;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .difficulty-btn.active {
+            border-color: #00b900;
+            background: #e8f8e8;
+            color: #0a5f0a;
+        }
         .mole-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -72,6 +93,10 @@
             background: #fff5d8;
             box-shadow: inset 0 0 0 2px #ffd166;
         }
+        .hole.active.rabbit {
+            background: #ffe6e6;
+            box-shadow: inset 0 0 0 2px #ff8a8a;
+        }
         .hole.active::after {
             content: "🐹";
             position: absolute;
@@ -80,6 +105,7 @@
             transform: translate(-50%, -50%);
             font-size: 34px;
         }
+        .hole.active.rabbit::after { content: "🐰"; }
 
         .overlay {
             margin-top: 14px;
@@ -128,8 +154,14 @@
         <div class="pill">分數：<span id="score">0</span></div>
     </div>
 
+    <div class="difficulty-row">
+        <button class="difficulty-btn active" id="diff-easy" onclick="setDifficulty('easy')">簡單（慢）</button>
+        <button class="difficulty-btn" id="diff-medium" onclick="setDifficulty('medium')">中等（快）</button>
+        <button class="difficulty-btn" id="diff-hard" onclick="setDifficulty('hard')">困難（快+兔）</button>
+    </div>
+
     <button class="btn btn-primary" id="start-btn" onclick="startGame()">開始遊戲</button>
-    <p class="hint">30 秒內盡量多打到地鼠</p>
+    <p class="hint">30 秒內盡量多打到地鼠，困難模式打到兔子會扣 1 分（最低 0 分）</p>
 
     <div class="mole-grid" id="mole-grid"></div>
 
@@ -143,6 +175,7 @@
         <h3 style="text-align:center;">🏆 本群 TOP 5</h3>
         <div id="rank-list"></div>
         <button class="btn btn-share" onclick="shareResult()">分享戰績到 LINE</button>
+        <button class="btn btn-primary" onclick="startGame()">重新開始</button>
         <button class="btn btn-lobby" onclick="window.location.href='../'">← 返回大廳</button>
     </div>
 </div>
@@ -158,10 +191,18 @@
     let score = 0;
     let remain = GAME_TIME;
     let activeIndex = -1;
+    let activeType = 'mole';
     let isRunning = false;
     let timerId = null;
     let moleId = null;
     let submitted = false;
+    let difficulty = 'easy';
+
+    const DIFFICULTY_CONFIG = {
+        easy:   { interval: 900, rabbitChance: 0 },
+        medium: { interval: 520, rabbitChance: 0 },
+        hard:   { interval: 520, rabbitChance: 0.28 }
+    };
 
     function buildGrid() {
         const grid = document.getElementById('mole-grid');
@@ -175,25 +216,48 @@
         }
     }
 
-    function setActiveHole(nextIndex) {
+    function setActiveHole(nextIndex, type) {
         const holes = Array.from(document.querySelectorAll('.hole'));
-        holes.forEach(h => h.classList.remove('active'));
+        holes.forEach(h => h.classList.remove('active', 'rabbit'));
         activeIndex = nextIndex;
-        if (activeIndex >= 0) holes[activeIndex].classList.add('active');
+        activeType = type || 'mole';
+        if (activeIndex >= 0) {
+            holes[activeIndex].classList.add('active');
+            if (activeType === 'rabbit') holes[activeIndex].classList.add('rabbit');
+        }
+    }
+
+    function setDifficulty(next) {
+        if (!DIFFICULTY_CONFIG[next]) return;
+        if (isRunning) {
+            showFlowNotice('進行中無法切換，請本局結束後再選難度。');
+            return;
+        }
+        difficulty = next;
+        ['easy', 'medium', 'hard'].forEach(key => {
+            const btn = document.getElementById(`diff-${key}`);
+            if (btn) btn.classList.toggle('active', key === difficulty);
+        });
     }
 
     function tickMole() {
         if (!isRunning) return;
         const next = Math.floor(Math.random() * 9);
-        setActiveHole(next);
+        const rabbitChance = DIFFICULTY_CONFIG[difficulty].rabbitChance;
+        const nextType = Math.random() < rabbitChance ? 'rabbit' : 'mole';
+        setActiveHole(next, nextType);
     }
 
     function hitMole(index) {
         if (!isRunning) return;
         if (index !== activeIndex) return;
-        score += 1;
+        if (activeType === 'rabbit') {
+            score = Math.max(0, score - 1);
+        } else {
+            score += 1;
+        }
         document.getElementById('score').innerText = score;
-        setActiveHole(-1);
+        setActiveHole(-1, 'mole');
         setTimeout(tickMole, 60);
     }
 
@@ -207,12 +271,14 @@
         document.getElementById('start-btn').style.display = 'none';
         document.getElementById('result-overlay').style.display = 'none';
         document.getElementById('leaderboard-section').style.display = 'none';
+        const toast = document.getElementById('flow-toast');
+        if (toast) toast.style.display = 'none';
 
         if (timerId) clearInterval(timerId);
         if (moleId) clearInterval(moleId);
 
         tickMole();
-        moleId = setInterval(tickMole, 650);
+        moleId = setInterval(tickMole, DIFFICULTY_CONFIG[difficulty].interval);
         timerId = setInterval(() => {
             remain -= 1;
             document.getElementById('time').innerText = remain;
@@ -225,21 +291,78 @@
         isRunning = false;
         clearInterval(timerId);
         clearInterval(moleId);
-        setActiveHole(-1);
+        setActiveHole(-1, 'mole');
         document.getElementById('final-score').innerText = score;
         document.getElementById('result-overlay').style.display = 'block';
         submitScore();
     }
 
     function buildShareText() {
+        const diffLabelMap = { easy: '簡單', medium: '中等', hard: '困難' };
         return [
             '==== 🔨 打地鼠挑戰賽 ==== ',
             `玩家｜${userProfile?.displayName || '玩家'}`,
+            `難度｜${diffLabelMap[difficulty] || '簡單'}`,
             `得分｜${score} 分`,
             '',
             '我剛完成一局，來挑戰我的反應速度！',
             '#LIFFGameLobby'
         ].join('\n');
+    }
+
+    function buildShareFlexMessage() {
+        const diffLabelMap = { easy: '簡單', medium: '中等', hard: '困難' };
+        return {
+            type: 'flex',
+            altText: `🔨 打地鼠戰績｜${userProfile?.displayName || '玩家'}｜${score} 分`,
+            contents: {
+                type: 'bubble',
+                body: {
+                    type: 'box',
+                    layout: 'vertical',
+                    spacing: 'md',
+                    contents: [
+                        { type: 'text', text: '🏆 打地鼠大賽結算', weight: 'bold', size: 'xl', color: '#00B900' },
+                        { type: 'text', text: `玩家：${userProfile?.displayName || '玩家'}`, size: 'md', color: '#333333' },
+                        { type: 'text', text: `成績：${score} 分`, weight: 'bold', size: 'xl', color: '#1F2D3D' },
+                        { type: 'text', text: `難度：${diffLabelMap[difficulty] || '簡單'}`, size: 'sm', color: '#555555' }
+                    ]
+                },
+                footer: {
+                    type: 'box',
+                    layout: 'vertical',
+                    contents: [
+                        {
+                            type: 'button',
+                            style: 'primary',
+                            color: '#00B900',
+                            action: {
+                                type: 'uri',
+                                label: '挑戰他！',
+                                uri: `https://liff.line.me/${LIFF_ID}`
+                            }
+                        }
+                    ]
+                }
+            }
+        };
+    }
+
+    function showFlowNotice(msg) {
+        let notice = document.getElementById('flow-toast');
+        if (!notice) {
+            notice = document.createElement('div');
+            notice.id = 'flow-toast';
+            notice.style.margin = '8px 0 2px';
+            notice.style.fontSize = '12px';
+            notice.style.color = '#666';
+            notice.style.textAlign = 'left';
+            document.querySelector('.container').insertBefore(notice, document.getElementById('mole-grid'));
+        }
+        notice.innerText = msg;
+        notice.style.display = 'block';
+        clearTimeout(showFlowNotice._timer);
+        showFlowNotice._timer = setTimeout(() => { notice.style.display = 'none'; }, 2600);
     }
 
     async function trySendResultMessage() {
@@ -248,8 +371,14 @@
             if (typeof liff === 'undefined') return { ok: false, reason: 'LIFF SDK 未載入。' };
             if (!liff.isInClient()) return { ok: false, reason: '請在 LINE App 內開啟。' };
             if (typeof liff.sendMessages !== 'function') return { ok: false, reason: '此情境不支援自動分享。' };
-            await liff.sendMessages([{ type: 'text', text: buildShareText() }]);
-            return { ok: true };
+            try {
+                await liff.sendMessages([buildShareFlexMessage()]);
+                return { ok: true };
+            } catch (flexErr) {
+                console.warn('Flex 自動分享失敗，改送文字', flexErr);
+                await liff.sendMessages([{ type: 'text', text: buildShareText() }]);
+                return { ok: true };
+            }
         } catch (err) {
             const detail = err?.message ? `（${err.message}）` : '';
             return { ok: false, reason: `自動分享失敗${detail}` };
@@ -259,12 +388,25 @@
     async function submitScore() {
         if (submitted || !userProfile) return;
         submitted = true;
+        showFlowNotice('結算中：正在嘗試自動分享...');
+        const diffLabelMap = { easy: '簡單', medium: '中等', hard: '困難' };
 
-        const shareResult = await Promise.race([
-            trySendResultMessage(),
-            new Promise(resolve => setTimeout(() => resolve({ ok: false, reason: '分享逾時，已略過。' }), 2800))
-        ]);
-        if (!shareResult.ok) console.warn(shareResult.reason);
+        let shareResult;
+        try {
+            shareResult = await Promise.race([
+                trySendResultMessage(),
+                new Promise(resolve => setTimeout(() => resolve({ ok: false, reason: '分享逾時，已略過自動分享。' }), 3500))
+            ]);
+        } catch (err) {
+            const detail = err?.message ? `（${err.message}）` : '';
+            shareResult = { ok: false, reason: `分享流程異常${detail}，已略過自動分享。` };
+        }
+
+        if (!shareResult.ok) {
+            showFlowNotice(`自動分享未送出：${shareResult.reason}`);
+        } else {
+            showFlowNotice('已自動分享戰績到 LINE。');
+        }
 
         const payload = {
             gameType: "whack_a_mole",
@@ -273,7 +415,12 @@
             userName: userProfile.displayName,
             score: score,
             isAscending: false,
-            extraData: JSON.stringify({ time: new Date().toISOString(), duration: GAME_TIME })
+            extraData: JSON.stringify({
+                time: new Date().toISOString(),
+                duration: GAME_TIME,
+                difficulty,
+                difficultyLabel: diffLabelMap[difficulty] || '簡單'
+            })
         };
 
         try {
@@ -308,11 +455,15 @@
             return;
         }
 
-        const message = { type: 'text', text: buildShareText() };
-
         try {
             if (typeof liff !== 'undefined' && liff.isInClient() && typeof liff.sendMessages === 'function') {
-                await liff.sendMessages([message]);
+                try {
+                    await liff.sendMessages([buildShareFlexMessage()]);
+                } catch (flexErr) {
+                    console.warn('手動 Flex 失敗，改送文字', flexErr);
+                    await liff.sendMessages([{ type: 'text', text: buildShareText() }]);
+                }
+                showFlowNotice('已手動分享戰績到 LINE。');
                 return;
             }
         } catch (err) {
@@ -321,8 +472,15 @@
 
         try {
             if (typeof liff !== 'undefined' && typeof liff.shareTargetPicker === 'function') {
-                const picked = await liff.shareTargetPicker([message]);
+                let picked;
+                try {
+                    picked = await liff.shareTargetPicker([buildShareFlexMessage()]);
+                } catch (flexErr) {
+                    console.warn('shareTargetPicker Flex 失敗，改送文字', flexErr);
+                    picked = await liff.shareTargetPicker([{ type: 'text', text: buildShareText() }]);
+                }
                 if (picked === false) alert('你已取消分享。');
+                else showFlowNotice('已手動分享戰績到 LINE。');
                 return;
             }
         } catch (err) {
