@@ -369,7 +369,8 @@
         if (!won && board.some(row => row.includes(2048))) {
             won = true;
             showOverlay('🎉 達成 2048！', `分數：${score} 分`);
-            submitScore(); return;
+            finishGameFlow();
+            return;
         }
         // Game-over check
         if (board.flat().includes(0)) return;
@@ -381,7 +382,7 @@
         }
         gameOver = true;
         showOverlay('💀 遊戲結束', `最終分數：${score} 分`);
-        submitScore();
+        finishGameFlow();
     }
 
     function showOverlay(title, msg) {
@@ -417,6 +418,27 @@
     }
 
     // ─── Score Submit ────────────────────────────────────────────────────────
+    async function trySendResultMessage() {
+        if (!userProfile || !liff.isApiAvailable('sendMessages')) return false;
+        const tile = board.flat().reduce((a, b) => Math.max(a, b), 0);
+        try {
+            await liff.sendMessages([{
+                type: 'text',
+                text: `🔢 2048 挑戰${won ? '成功' : '結束'}！\n玩家：${userProfile.displayName}\n得分：${score} 分　最高磚：${tile}\n快來挑戰我的排名吧！`
+            }]);
+            return true;
+        } catch (err) {
+            console.warn('戰績分享失敗，繼續上傳分數', err);
+            return false;
+        }
+    }
+
+    async function finishGameFlow() {
+        if (submitted) return;
+        await trySendResultMessage();
+        await submitScore();
+    }
+
     async function submitScore() {
         if (submitted || !userProfile) return;
         submitted = true;

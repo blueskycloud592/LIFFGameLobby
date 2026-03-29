@@ -185,6 +185,7 @@
     let canvas, ctx, cellSize;
     let snake, food, direction, nextDirection;
     let score, speed, gameLoop, isRunning;
+    let gameFinished = false;
     let userProfile = null;
     let liffContext = null;
 
@@ -238,6 +239,7 @@
         score         = 0;
         speed         = 150;
         isRunning     = true;
+        gameFinished  = false;
 
         placeFood();
         draw();
@@ -290,11 +292,13 @@
     }
 
     async function endGame() {
+        if (gameFinished) return;
+        gameFinished = true;
         clearInterval(gameLoop);
         isRunning = false;
         document.getElementById('final-score').innerText = score;
         document.getElementById('gameover-overlay').style.display = 'flex';
-        await submitScore();
+        await finishGameFlow();
     }
 
     // ─── Drawing ─────────────────────────────────────────────────────────────
@@ -422,6 +426,25 @@
     }
 
     // ─── Score Submission ────────────────────────────────────────────────────
+    async function trySendResultMessage() {
+        if (!userProfile || !liff.isApiAvailable('sendMessages')) return false;
+        try {
+            await liff.sendMessages([{
+                type: 'text',
+                text: `🐍 貪食蛇挑戰結束！\n玩家：${userProfile.displayName}\n得分：${score} 分\n快來挑戰我的排名吧！`
+            }]);
+            return true;
+        } catch (err) {
+            console.warn('戰績分享失敗，繼續上傳分數', err);
+            return false;
+        }
+    }
+
+    async function finishGameFlow() {
+        await trySendResultMessage();
+        await submitScore();
+    }
+
     async function submitScore() {
         if (!userProfile) return;
 

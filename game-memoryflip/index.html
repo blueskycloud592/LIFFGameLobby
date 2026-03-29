@@ -62,6 +62,7 @@
     let flippedCards = [];
     let matchedCount = 0;
     let isProcessing = false;
+    let gameFinished = false;
     let userProfile = null;
     let liffContext = null;
 
@@ -121,7 +122,7 @@
             matchedCount += 2;
             flippedCards = [];
             isProcessing = false;
-            if (matchedCount === emojis.length) handleWin();
+            if (matchedCount === emojis.length) finishGameFlow();
         } else {
             setTimeout(() => {
                 c1.classList.remove('flipped');
@@ -133,6 +134,27 @@
     }
 
     // --- 3. 處理勝利與上傳 ---
+    async function trySendResultMessage() {
+        if (!userProfile || !liff.isApiAvailable('sendMessages')) return false;
+        try {
+            await liff.sendMessages([{
+                type: 'text',
+                text: `🎮 記憶翻牌挑戰成功！\n玩家：${userProfile.displayName}\n成績：${moves} 步\n快來挑戰我的排名吧！`
+            }]);
+            return true;
+        } catch (err) {
+            console.warn('戰績分享失敗，繼續上傳分數', err);
+            return false;
+        }
+    }
+
+    async function finishGameFlow() {
+        if (gameFinished) return;
+        gameFinished = true;
+        await trySendResultMessage();
+        await handleWin();
+    }
+
     async function handleWin() {
         const scoreData = {
             gameType: "memory_flip",
