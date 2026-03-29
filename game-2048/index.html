@@ -419,23 +419,33 @@
 
     // ─── Score Submit ────────────────────────────────────────────────────────
     async function trySendResultMessage() {
-        if (!userProfile) {
-            return { ok: false, reason: '尚未登入 LINE，無法自動分享。' };
-        }
-        if (!liff.isApiAvailable('sendMessages')) {
-            return { ok: false, reason: '目前聊天情境不支援自動分享（常見於 1 對 1 或非 LINE 內開啟）。' };
-        }
         const tile = board.flat().reduce((a, b) => Math.max(a, b), 0);
-        try {
-            await liff.sendMessages([{
-                type: 'text',
-                text: `🔢 2048 挑戰${won ? '成功' : '結束'}！\n玩家：${userProfile.displayName}\n得分：${score} 分　最高磚：${tile}\n快來挑戰我的排名吧！`
-            }]);
-            return { ok: true };
-        } catch (err) {
-            console.warn('戰績分享失敗，繼續上傳分數', err);
-            return { ok: false, reason: '分享權限或網路異常，訊息未送出。' };
+        if (!userProfile) return { ok: false, reason: '尚未登入 LINE，無法自動分享。' };
+        const message = {
+            type: 'text',
+            text: `🔢 2048 挑戰${won ? '成功' : '結束'}！\n玩家：${userProfile.displayName}\n得分：${score} 分　最高磚：${tile}\n快來挑戰我的排名吧！`
+        };
+
+        if (liff.isApiAvailable('sendMessages')) {
+            try {
+                await liff.sendMessages([message]);
+                return { ok: true };
+            } catch (err) {
+                console.warn('sendMessages 失敗，改用 shareTargetPicker', err);
+            }
         }
+
+        if (liff.isApiAvailable('shareTargetPicker')) {
+            try {
+                const picked = await liff.shareTargetPicker([message]);
+                if (picked === false) return { ok: false, reason: '你已取消分享。' };
+                return { ok: true };
+            } catch (err) {
+                console.warn('shareTargetPicker 失敗', err);
+            }
+        }
+
+        return { ok: false, reason: '目前環境不支援自動分享，請改按下方「分享戰績到 LINE」。' };
     }
 
     async function finishGameFlow() {
