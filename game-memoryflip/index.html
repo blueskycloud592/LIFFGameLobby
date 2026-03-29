@@ -29,18 +29,6 @@
         .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; margin-top: 10px; }
         .btn-primary { background: var(--line-green); color: white; }
         .btn-share { background: #3b5998; color: white; }
-        .flow-notice { display: none; margin: 8px 0 2px; font-size: 12px; color: #666; text-align: left; }
-        .share-status {
-            margin: 8px 0 2px;
-            padding: 8px 10px;
-            border-radius: 8px;
-            background: #fff4cc;
-            color: #5d4300;
-            font-size: 12px;
-            text-align: left;
-            border: 1px solid #f1d37a;
-            line-height: 1.5;
-        }
     </style>
 </head>
 <body>
@@ -52,10 +40,6 @@
         <div>玩家: <span id="user-name">載入中...</span></div>
         <div>步數: <span id="move-count">0</span></div>
     </div>
-
-    <div class="share-status" id="share-status">分享狀態：尚未觸發（build: memory-20260329-2）</div>
-
-    <div class="flow-notice" id="flow-notice"></div>
 
     <div class="game-grid" id="game-grid">
         <!-- 卡牌由 JS 動態生成 -->
@@ -150,10 +134,20 @@
     }
 
     function showFlowNotice(msg) {
-        const notice = document.getElementById('flow-notice');
+        let notice = document.getElementById('flow-toast');
+        if (!notice) {
+            notice = document.createElement('div');
+            notice.id = 'flow-toast';
+            notice.style.margin = '8px 0 2px';
+            notice.style.fontSize = '12px';
+            notice.style.color = '#666';
+            notice.style.textAlign = 'left';
+            document.querySelector('.container').insertBefore(notice, document.getElementById('game-grid'));
+        }
         notice.innerText = msg;
         notice.style.display = 'block';
-        document.getElementById('share-status').innerText = `分享狀態：${msg}（build: memory-20260329-2）`;
+        clearTimeout(showFlowNotice._timer);
+        showFlowNotice._timer = setTimeout(() => { notice.style.display = 'none'; }, 2600);
     }
 
     // --- 3. 處理勝利與上傳 ---

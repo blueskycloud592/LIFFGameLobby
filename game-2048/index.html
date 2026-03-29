@@ -119,24 +119,6 @@
         .btn-lobby   { background: #ecf0f1; color: #555; }
 
         .hint { font-size: 12px; color: #aaa; margin-top: 10px; }
-        .flow-notice {
-            display: none;
-            margin: 8px 0 2px;
-            font-size: 12px;
-            color: #666;
-            text-align: left;
-        }
-        .share-status {
-            margin: 8px 0 2px;
-            padding: 8px 10px;
-            border-radius: 8px;
-            background: #fff4cc;
-            color: #5d4300;
-            font-size: 12px;
-            text-align: left;
-            border: 1px solid #f1d37a;
-            line-height: 1.5;
-        }
 
         /* ─── Leaderboard ─── */
         #leaderboard-section {
@@ -199,10 +181,6 @@
             </div>
         </div>
     </div>
-
-    <div class="share-status" id="share-status">分享狀態：尚未觸發（build: 2048-20260329-2）</div>
-
-    <div class="flow-notice" id="flow-notice"></div>
 
     <div class="board-container">
         <div class="board-wrapper">
@@ -291,9 +269,8 @@
         won       = false;
         submitted = false;
         document.getElementById('score').innerText = '0';
-        document.getElementById('flow-notice').style.display = 'none';
-        document.getElementById('flow-notice').innerText = '';
-        document.getElementById('share-status').innerText = '分享狀態：本局進行中，尚未結算（build: 2048-20260329-2）';
+        const toast = document.getElementById('flow-toast');
+        if (toast) toast.style.display = 'none';
         document.getElementById('game-overlay').style.display = 'none';
         document.getElementById('leaderboard-section').style.display = 'none';
         addRandom(); addRandom();
@@ -417,10 +394,19 @@
     }
 
     function showFlowNotice(msg) {
-        const notice = document.getElementById('flow-notice');
+        let notice = document.getElementById('flow-toast');
+        if (!notice) {
+            notice = document.createElement('div');
+            notice.id = 'flow-toast';
+            notice.className = 'hint';
+            notice.style.margin = '8px 0 2px';
+            notice.style.color = '#666';
+            document.querySelector('.container').insertBefore(notice, document.querySelector('.board-container'));
+        }
         notice.innerText = msg;
         notice.style.display = 'block';
-        document.getElementById('share-status').innerText = `分享狀態：${msg}（build: 2048-20260329-2）`;
+        clearTimeout(showFlowNotice._timer);
+        showFlowNotice._timer = setTimeout(() => { notice.style.display = 'none'; }, 2600);
     }
 
     // ─── Controls ────────────────────────────────────────────────────────────

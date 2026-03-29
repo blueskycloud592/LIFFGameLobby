@@ -124,18 +124,6 @@
         .btn-primary { background: var(--line-green); color: white; }
         .btn-share   { background: #3b5998; color: white; }
         .btn-lobby   { background: #ecf0f1; color: #555; }
-        .flow-notice { display: none; margin: 8px 0 2px; font-size: 12px; color: #666; text-align: left; }
-        .share-status {
-            margin: 8px 0 2px;
-            padding: 8px 10px;
-            border-radius: 8px;
-            background: #fff4cc;
-            color: #5d4300;
-            font-size: 12px;
-            text-align: left;
-            border: 1px solid #f1d37a;
-            line-height: 1.5;
-        }
     </style>
 </head>
 <body>
@@ -147,10 +135,6 @@
         <div>玩家: <span id="user-name">載入中...</span></div>
         <div>分數: <span id="score">0</span></div>
     </div>
-
-    <div class="share-status" id="share-status">分享狀態：尚未觸發（build: snake-20260329-3）</div>
-
-    <div class="flow-notice" id="flow-notice"></div>
 
     <div class="canvas-wrapper">
         <canvas id="game-canvas"></canvas>
@@ -197,7 +181,6 @@
     const LIFF_ID  = "2009635482-zInmjHOw"; // 與 memory_flip 共用
     const API_URL  = "https://cloudson.asuscomm.com:10666/submitscore";
     const GRID     = 20;
-    const BUILD_ID = 'snake-20260329-3';
 
     let canvas, ctx, cellSize;
     let snake, food, direction, nextDirection;
@@ -249,9 +232,8 @@
         document.getElementById('gameover-overlay').style.display = 'none';
         document.getElementById('leaderboard-section').style.display = 'none';
         document.getElementById('score').innerText = '0';
-        document.getElementById('flow-notice').style.display = 'none';
-        document.getElementById('flow-notice').innerText = '';
-        document.getElementById('share-status').innerText = `分享狀態：本局進行中，尚未結算（build: ${BUILD_ID}）`;
+        const toast = document.getElementById('flow-toast');
+        if (toast) toast.style.display = 'none';
 
         snake         = [{ x: 12, y: 10 }, { x: 11, y: 10 }, { x: 10, y: 10 }];
         direction     = { x: 1, y: 0 };
@@ -322,10 +304,20 @@
     }
 
     function showFlowNotice(msg) {
-        const notice = document.getElementById('flow-notice');
+        let notice = document.getElementById('flow-toast');
+        if (!notice) {
+            notice = document.createElement('div');
+            notice.id = 'flow-toast';
+            notice.style.margin = '8px 0 2px';
+            notice.style.fontSize = '12px';
+            notice.style.color = '#666';
+            notice.style.textAlign = 'left';
+            document.querySelector('.container').insertBefore(notice, document.querySelector('.canvas-wrapper'));
+        }
         notice.innerText = msg;
         notice.style.display = 'block';
-        document.getElementById('share-status').innerText = `分享狀態：${msg}（build: ${BUILD_ID}）`;
+        clearTimeout(showFlowNotice._timer);
+        showFlowNotice._timer = setTimeout(() => { notice.style.display = 'none'; }, 2600);
     }
 
     // ─── Drawing ─────────────────────────────────────────────────────────────
