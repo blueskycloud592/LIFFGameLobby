@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>記憶翻牌挑戰賽</title>
+    <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <style>
+        :root { --line-green: #00b900; --card-back: #2c3e50; }
+        body { font-family: -apple-system, sans-serif; background: #f4f7f6; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        
+        .container { max-width: 400px; width: 100%; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center; }
+        .status-bar { display: flex; justify-content: space-between; margin-bottom: 15px; font-weight: bold; color: #666; font-size: 14px; }
+        
+        /* 遊戲網格 */
+        .game-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 20px 0; }
+        .card { height: 70px; background: var(--card-back); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 24px; color: transparent; cursor: pointer; transition: transform 0.3s, background 0.3s; user-select: none; }
+        .card.flipped { background: #ecf0f1; color: #333; transform: rotateY(180deg); }
+        .card.matched { background: var(--line-green); color: white; cursor: default; }
+
+        /* 排行榜 */
+        #leaderboard-section { margin-top: 25px; display: none; border-top: 2px solid #eee; padding-top: 15px; text-align: left; }
+        .rank-item { display: flex; align-items: center; padding: 10px; border-bottom: 1px solid #f0f0f0; }
+        .rank-number { width: 30px; font-weight: bold; color: var(--line-green); }
+        .rank-name { flex: 1; }
+        .rank-score { font-weight: bold; color: #e67e22; }
+        .my-rank { background: #fff9db !important; border-radius: 5px; }
+
+        .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; margin-top: 10px; }
+        .btn-primary { background: var(--line-green); color: white; }
+        .btn-share { background: #3b5998; color: white; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>🧩 記憶翻牌</h2>
+    
+    <div class="status-bar">
+        <div>玩家: <span id="user-name">載入中...</span></div>
+        <div>步數: <span id="move-count">0</span></div>
+    </div>
+
+    <div class="game-grid" id="game-grid">
+        <!-- 卡牌由 JS 動態生成 -->
+    </div>
+
+    <div id="leaderboard-section">
+        <h3 style="text-align: center;">🏆 本群 TOP 5</h3>
+        <div id="rank-list"></div>
+        <button class="btn btn-share" onclick="shareResult()">分享戰績到 LINE</button>
+        <button class="btn" style="background:#eee" onclick="location.reload()">重新開始</button>
+    </div>
+</div>
+
+<script>
+    // --- 配置區 ---
+    const LIFF_ID = "2009635482-zInmjHOw"; 
+    const API_URL = "https://cloudson.asuscomm.com:10666/submitscore"; 
+
+    let moves = 0;
+    let flippedCards = [];
+    let matchedCount = 0;
+    let isProcessing = false;
+    let userProfile = null;
+    let liffContext = null;
+
+    // --- 1. 初始化 LIFF ---
+    async function initLiff() {
+        try {
+            await liff.init({ liffId: LIFF_ID });
+            if (!liff.isLoggedIn()) {
+                liff.login();
+            } else {
+                userProfile = await liff.getProfile();
+                liffContext = liff.getContext();
+                document.getElementById('user-name').innerText = userProfile.displayName;
+                createBoard();
+            }
+        } catch (err) { console.error("LIFF Init Failed", err); }
+    }
+
+    // --- 2. 遊戲邏輯 ---
+    const emojis = ['🍎', '🍎', '🍌', '🍌', '🍇', '🍇', '🍓', '🍓', '🍒', '🍒', '🍍', '🍍', '🥝', '🥝', '🍉', '🍉'];
+
+    function createBoard() {
+        const grid = document.getElementById('game-grid');
+        const shuffled = emojis.sort(() => Math.random() - 0.5);
+        
+        shuffled.forEach((emoji, index) => {
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.dataset.value = emoji;
+            card.dataset.index = index;
+            card.innerText = emoji;
+            card.onclick = () => flipCard(card);
+            grid.appendChild(card);
+        });
+    }
+
+    function flipCard(card) {
+        if (isProcessing || card.classList.contains('flipped') || card.classList.contains('matched')) return;
+
+        card.classList.add('flipped');
+        flippedCards.push(card);
+
+        if (flippedCards.length === 2) {
+            moves++;
+            document.getElementById('move-count').innerText = moves;
+            checkMatch();
+        }
+    }
+
+    function checkMatch() {
+        isProcessing = true;
+        const [c1, c2] = flippedCards;
+
+        if (c1.dataset.value === c2.dataset.value) {
+            c1.classList.add('matched');
+            c2.classList.add('matched');
+            matchedCount += 2;
+            flippedCards = [];
+            isProcessing = false;
+            if (matchedCount === emojis.length) handleWin();
+        } else {
+            setTimeout(() => {
+                c1.classList.remove('flipped');
+                c2.classList.remove('flipped');
+                flippedCards = [];
+                isProcessing = false;
+            }, 800);
+        }
+    }
+
+    // --- 3. 處理勝利與上傳 ---
+    async function handleWin() {
+        const scoreData = {
+            gameType: "memory_flip",
+            groupId: liffContext.groupId || "personal_chat",
+            userId: userProfile.userId,
+            userName: userProfile.displayName,
+            score: moves,
+            isAscending: true,
+            extraData: JSON.stringify({ time: new Date().toISOString() })
+        };
+
+        try {
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(scoreData)
+            });
+            const result = await response.json();
+            if (result.success) renderLeaderboard(result.data);
+        } catch (error) {
+            alert("上傳失敗，請檢查 API 連線");
+        }
+    }
+
+    // --- 4. 渲染排行榜 ---
+    function renderLeaderboard(data) {
+        const listContainer = document.getElementById('rank-list');
+        listContainer.innerHTML = data.map(item => `
+            <div class="rank-item ${item.userName === userProfile.displayName ? 'my-rank' : ''}">
+                <div class="rank-number">${item.rank}</div>
+                <div class="rank-name">${item.userName}</div>
+                <div class="rank-score">${item.score} 步</div>
+            </div>
+        `).join('');
+        document.getElementById('leaderboard-section').style.display = 'block';
+        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    }
+
+    async function shareResult() {
+        if (liff.isApiAvailable('shareTargetPicker')) {
+            await liff.shareTargetPicker([{
+                "type": "text",
+                "text": `🎮 記憶翻牌挑戰成功！\n玩家：${userProfile.displayName}\n成績：${moves} 步\n快來挑戰我的排名吧！`
+            }]);
+        }
+    }
+
+    initLiff();
+</script>
+</body>
+</html>

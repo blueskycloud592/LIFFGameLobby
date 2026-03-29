@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LINE 遊戲大廳</title>
+    <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <style>
+        :root { --line-green: #00b900; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, sans-serif;
+            background: linear-gradient(160deg, #00b900 0%, #005f00 100%);
+            min-height: 100vh;
+            padding: 24px 16px 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* ─── Header ─── */
+        .header { color: white; text-align: center; margin-bottom: 20px; }
+        .header h1 { font-size: 26px; letter-spacing: 1px; }
+        .header p  { font-size: 13px; opacity: 0.85; margin-top: 4px; }
+
+        /* ─── User card ─── */
+        .user-card {
+            background: rgba(255,255,255,0.18);
+            border-radius: 14px;
+            padding: 12px 18px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: white;
+            margin-bottom: 24px;
+            width: 100%;
+            max-width: 400px;
+        }
+        .user-avatar {
+            width: 46px; height: 46px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.3);
+            object-fit: cover;
+            flex-shrink: 0;
+        }
+        .user-avatar-placeholder {
+            width: 46px; height: 46px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.3);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 22px; flex-shrink: 0;
+        }
+        .user-info .user-name { font-weight: bold; font-size: 15px; }
+        .user-info .user-sub  { font-size: 12px; opacity: 0.75; margin-top: 2px; }
+
+        /* ─── Game list ─── */
+        .game-list {
+            width: 100%;
+            max-width: 400px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+        .game-card {
+            background: white;
+            border-radius: 16px;
+            padding: 18px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.18);
+            cursor: pointer;
+            transition: transform 0.15s, box-shadow 0.15s;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .game-card:active { transform: scale(0.97); box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
+        .game-icon {
+            width: 62px; height: 62px;
+            background: #f0f4f2;
+            border-radius: 14px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 34px;
+            flex-shrink: 0;
+        }
+        .game-info { flex: 1; text-align: left; }
+        .game-title { font-size: 17px; font-weight: bold; color: #2c3e50; margin-bottom: 3px; }
+        .game-desc  { font-size: 12px; color: #888; margin-bottom: 7px; line-height: 1.4; }
+        .game-badge {
+            display: inline-block;
+            background: #e8f5e9;
+            color: var(--line-green);
+            font-size: 11px; font-weight: bold;
+            padding: 2px 9px;
+            border-radius: 20px;
+        }
+        .play-btn {
+            background: var(--line-green);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            padding: 10px 16px;
+            font-size: 14px; font-weight: bold;
+            cursor: pointer;
+            flex-shrink: 0;
+            white-space: nowrap;
+        }
+
+        /* ─── Footer ─── */
+        .footer {
+            color: rgba(255,255,255,0.5);
+            font-size: 11px;
+            margin-top: 32px;
+            text-align: center;
+        }
+
+        /* ─── Loading state ─── */
+        .loading-spinner {
+            width: 46px; height: 46px;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            flex-shrink: 0;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>🎮 遊戲大廳</h1>
+    <p>選擇遊戲，挑戰群組排行榜！</p>
+</div>
+
+<div class="user-card">
+    <div class="loading-spinner" id="avatar-spinner"></div>
+    <img id="user-avatar" class="user-avatar" src="" alt="avatar" style="display:none;">
+    <div id="avatar-placeholder" class="user-avatar-placeholder" style="display:none;">👤</div>
+    <div class="user-info">
+        <div class="user-name" id="user-name">載入中...</div>
+        <div class="user-sub" id="user-sub">正在連接 LINE...</div>
+    </div>
+</div>
+
+<div class="game-list">
+
+    <div class="game-card" onclick="openGame('game-memoryflip/')">
+        <div class="game-icon">🧩</div>
+        <div class="game-info">
+            <div class="game-title">記憶翻牌</div>
+            <div class="game-desc">翻開配對所有卡牌，步數越少越厲害！</div>
+            <span class="game-badge">步數最少勝</span>
+        </div>
+        <button class="play-btn">開玩</button>
+    </div>
+
+    <div class="game-card" onclick="openGame('game-snake/')">
+        <div class="game-icon">🐍</div>
+        <div class="game-info">
+            <div class="game-title">貪食蛇</div>
+            <div class="game-desc">操控蛇吃食物，分數越高越厲害！</div>
+            <span class="game-badge">分數最高勝</span>
+        </div>
+        <button class="play-btn">開玩</button>
+    </div>
+
+</div>
+
+<div class="footer">Powered by LINE LIFF</div>
+
+<script>
+    const LIFF_ID = "2009635482-zInmjHOw"; // 與 memory_flip 共用
+
+    async function initLiff() {
+        try {
+            await liff.init({ liffId: LIFF_ID });
+
+            if (!liff.isLoggedIn()) {
+                liff.login();
+                return;
+            }
+
+            const profile = await liff.getProfile();
+            document.getElementById('user-name').innerText = profile.displayName;
+            document.getElementById('user-sub').innerText = '點選遊戲開始挑戰！';
+            document.getElementById('avatar-spinner').style.display = 'none';
+
+            if (profile.pictureUrl) {
+                const img = document.getElementById('user-avatar');
+                img.src = profile.pictureUrl;
+                img.style.display = 'block';
+            } else {
+                document.getElementById('avatar-placeholder').style.display = 'flex';
+            }
+
+        } catch (err) {
+            console.error("LIFF Init Failed", err);
+            document.getElementById('user-name').innerText = '訪客模式';
+            document.getElementById('user-sub').innerText = '請透過 LINE 開啟';
+            document.getElementById('avatar-spinner').style.display = 'none';
+            document.getElementById('avatar-placeholder').style.display = 'flex';
+        }
+    }
+
+    function openGame(path) {
+        window.location.href = path;
+    }
+
+    initLiff();
+</script>
+</body>
+</html>

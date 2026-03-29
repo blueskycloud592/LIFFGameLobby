@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>貪食蛇挑戰賽</title>
+    <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <style>
+        :root { --line-green: #00b900; --bg-dark: #1a1a2e; }
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, sans-serif;
+            background: #f4f7f6;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            max-width: 400px;
+            width: 100%;
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 14px;
+            font-weight: bold;
+            color: #666;
+            font-size: 14px;
+        }
+
+        /* ─── Canvas ─── */
+        .canvas-wrapper {
+            position: relative;
+            border-radius: 12px;
+            overflow: hidden;
+            background: var(--bg-dark);
+            line-height: 0; /* remove inline gap */
+        }
+        #game-canvas { display: block; }
+
+        /* ─── Overlays ─── */
+        .overlay {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0,0,0,0.78);
+            color: white;
+            gap: 10px;
+            padding: 20px;
+        }
+        .overlay h3  { margin: 0; font-size: 22px; }
+        .overlay p   { margin: 0; font-size: 15px; opacity: 0.85; }
+        .overlay-btn {
+            background: var(--line-green);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            padding: 12px 36px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 6px;
+        }
+
+        /* ─── D-pad ─── */
+        .dpad {
+            display: grid;
+            grid-template-columns: repeat(3, 54px);
+            grid-template-rows: repeat(3, 54px);
+            gap: 6px;
+            margin: 16px auto 4px;
+            width: fit-content;
+        }
+        .dpad-btn {
+            width: 54px; height: 54px;
+            background: #ecf0f1;
+            border: none;
+            border-radius: 12px;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: background 0.1s, transform 0.08s;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+        .dpad-btn:active, .dpad-btn.pressed {
+            background: var(--line-green);
+            color: white;
+            transform: scale(0.92);
+        }
+
+        /* ─── Leaderboard ─── */
+        #leaderboard-section {
+            margin-top: 22px;
+            display: none;
+            border-top: 2px solid #eee;
+            padding-top: 15px;
+            text-align: left;
+        }
+        .rank-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .rank-number { width: 30px; font-weight: bold; color: var(--line-green); }
+        .rank-name   { flex: 1; }
+        .rank-score  { font-weight: bold; color: #e67e22; }
+        .my-rank     { background: #fff9db !important; border-radius: 5px; }
+
+        .btn         { width: 100%; padding: 12px; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; margin-top: 10px; }
+        .btn-primary { background: var(--line-green); color: white; }
+        .btn-share   { background: #3b5998; color: white; }
+        .btn-lobby   { background: #ecf0f1; color: #555; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>🐍 貪食蛇</h2>
+
+    <div class="status-bar">
+        <div>玩家: <span id="user-name">載入中...</span></div>
+        <div>分數: <span id="score">0</span></div>
+    </div>
+
+    <div class="canvas-wrapper">
+        <canvas id="game-canvas"></canvas>
+
+        <!-- Start overlay -->
+        <div class="overlay" id="start-overlay">
+            <h3>🐍 貪食蛇</h3>
+            <p>滑動畫面或使用方向鍵</p>
+            <button class="overlay-btn" onclick="startGame()">開始遊戲</button>
+        </div>
+
+        <!-- Game-over overlay -->
+        <div class="overlay" id="gameover-overlay" style="display:none;">
+            <h3>💀 遊戲結束</h3>
+            <p>得分：<strong id="final-score">0</strong> 分</p>
+            <button class="overlay-btn" onclick="startGame()">再玩一次</button>
+        </div>
+    </div>
+
+    <!-- D-pad -->
+    <div class="dpad">
+        <div></div>
+        <button class="dpad-btn" id="btn-up">▲</button>
+        <div></div>
+        <button class="dpad-btn" id="btn-left">◀</button>
+        <div></div>
+        <button class="dpad-btn" id="btn-right">▶</button>
+        <div></div>
+        <button class="dpad-btn" id="btn-down">▼</button>
+        <div></div>
+    </div>
+
+    <!-- Leaderboard (shown after game over) -->
+    <div id="leaderboard-section">
+        <h3 style="text-align:center;">🏆 本群 TOP 5</h3>
+        <div id="rank-list"></div>
+        <button class="btn btn-share" onclick="shareResult()">分享戰績到 LINE</button>
+        <button class="btn btn-primary" onclick="startGame()">重新開始</button>
+        <button class="btn btn-lobby" onclick="window.location.href='../'">← 返回大廳</button>
+    </div>
+</div>
+
+<script>
+    const LIFF_ID  = "2009635482-zInmjHOw"; // 與 memory_flip 共用
+    const API_URL  = "https://cloudson.asuscomm.com:10666/submitscore";
+    const GRID     = 20;
+
+    let canvas, ctx, cellSize;
+    let snake, food, direction, nextDirection;
+    let score, speed, gameLoop, isRunning;
+    let userProfile = null;
+    let liffContext = null;
+
+    // ─── LIFF Init ───────────────────────────────────────────────────────────
+    async function initLiff() {
+        try {
+            await liff.init({ liffId: LIFF_ID });
+            if (!liff.isLoggedIn()) {
+                liff.login();
+                return;
+            }
+            userProfile = await liff.getProfile();
+            liffContext  = liff.getContext();
+            document.getElementById('user-name').innerText = userProfile.displayName;
+        } catch (err) {
+            console.error("LIFF Init Failed", err);
+            document.getElementById('user-name').innerText = '訪客';
+        }
+        initCanvas();
+    }
+
+    // ─── Canvas Setup ────────────────────────────────────────────────────────
+    function initCanvas() {
+        canvas   = document.getElementById('game-canvas');
+        ctx      = canvas.getContext('2d');
+        const container = document.querySelector('.container');
+        const size = Math.min(container.clientWidth - 40, 360);
+        canvas.width  = size;
+        canvas.height = size;
+        cellSize = size / GRID;
+
+        drawIdle();
+        setupControls();
+    }
+
+    function drawIdle() {
+        ctx.fillStyle = '#1a1a2e';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    // ─── Game Flow ───────────────────────────────────────────────────────────
+    function startGame() {
+        document.getElementById('start-overlay').style.display    = 'none';
+        document.getElementById('gameover-overlay').style.display = 'none';
+        document.getElementById('leaderboard-section').style.display = 'none';
+        document.getElementById('score').innerText = '0';
+
+        snake         = [{ x: 12, y: 10 }, { x: 11, y: 10 }, { x: 10, y: 10 }];
+        direction     = { x: 1, y: 0 };
+        nextDirection = { x: 1, y: 0 };
+        score         = 0;
+        speed         = 150;
+        isRunning     = true;
+
+        placeFood();
+        draw();
+
+        if (gameLoop) clearInterval(gameLoop);
+        gameLoop = setInterval(tick, speed);
+    }
+
+    function placeFood() {
+        let pos;
+        do {
+            pos = {
+                x: Math.floor(Math.random() * GRID),
+                y: Math.floor(Math.random() * GRID)
+            };
+        } while (snake.some(s => s.x === pos.x && s.y === pos.y));
+        food = pos;
+    }
+
+    function tick() {
+        direction = { ...nextDirection };
+        const head = { x: snake[0].x + direction.x, y: snake[0].y + direction.y };
+
+        // Wall collision
+        if (head.x < 0 || head.x >= GRID || head.y < 0 || head.y >= GRID) {
+            endGame(); return;
+        }
+        // Self collision
+        if (snake.some(s => s.x === head.x && s.y === head.y)) {
+            endGame(); return;
+        }
+
+        snake.unshift(head);
+
+        if (head.x === food.x && head.y === food.y) {
+            score++;
+            document.getElementById('score').innerText = score;
+            // Speed up every 5 food items
+            if (score % 5 === 0 && speed > 70) {
+                speed -= 10;
+                clearInterval(gameLoop);
+                gameLoop = setInterval(tick, speed);
+            }
+            placeFood();
+        } else {
+            snake.pop();
+        }
+
+        draw();
+    }
+
+    async function endGame() {
+        clearInterval(gameLoop);
+        isRunning = false;
+        document.getElementById('final-score').innerText = score;
+        document.getElementById('gameover-overlay').style.display = 'flex';
+        await submitScore();
+    }
+
+    // ─── Drawing ─────────────────────────────────────────────────────────────
+    function draw() {
+        const W = canvas.width;
+        const H = canvas.height;
+        const cs = cellSize;
+
+        // Background
+        ctx.fillStyle = '#1a1a2e';
+        ctx.fillRect(0, 0, W, H);
+
+        // Subtle grid dots
+        ctx.fillStyle = 'rgba(255,255,255,0.04)';
+        for (let gx = 0; gx < GRID; gx++) {
+            for (let gy = 0; gy < GRID; gy++) {
+                ctx.fillRect(gx * cs + cs / 2 - 1, gy * cs + cs / 2 - 1, 2, 2);
+            }
+        }
+
+        // Food — glowing circle
+        ctx.shadowColor = '#ff6b6b';
+        ctx.shadowBlur  = 8;
+        ctx.fillStyle   = '#ff6b6b';
+        ctx.beginPath();
+        ctx.arc(food.x * cs + cs / 2, food.y * cs + cs / 2, cs / 2 - 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // Snake — rounded segments
+        snake.forEach((seg, i) => {
+            const x = seg.x * cs + 2;
+            const y = seg.y * cs + 2;
+            const s = cs - 4;
+            const r = s / (i === 0 ? 3 : 4);
+
+            if (i === 0) {
+                ctx.fillStyle   = '#00e676';
+                ctx.shadowColor = '#00e676';
+                ctx.shadowBlur  = 6;
+            } else {
+                const alpha = Math.max(0.35, 1 - i / (snake.length + 4));
+                ctx.fillStyle  = `rgba(0,185,0,${alpha})`;
+                ctx.shadowBlur = 0;
+            }
+
+            roundRect(x, y, s, s, r);
+            ctx.fill();
+        });
+        ctx.shadowBlur = 0;
+    }
+
+    function roundRect(x, y, w, h, r) {
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.lineTo(x + w - r, y);
+        ctx.arcTo(x + w, y,     x + w, y + r,     r);
+        ctx.lineTo(x + w, y + h - r);
+        ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+        ctx.lineTo(x + r, y + h);
+        ctx.arcTo(x,     y + h, x,     y + h - r, r);
+        ctx.lineTo(x, y + r);
+        ctx.arcTo(x,     y,     x + r, y,         r);
+        ctx.closePath();
+    }
+
+    // ─── Controls ────────────────────────────────────────────────────────────
+    function setDirection(dx, dy) {
+        if (!isRunning) return;
+        // Prevent 180-degree reversal
+        if (dx !== 0 && direction.x !== 0) return;
+        if (dy !== 0 && direction.y !== 0) return;
+        nextDirection = { x: dx, y: dy };
+    }
+
+    function setupControls() {
+        // D-pad buttons
+        const dpadMap = [
+            ['btn-up',    0, -1],
+            ['btn-down',  0,  1],
+            ['btn-left', -1,  0],
+            ['btn-right', 1,  0]
+        ];
+        dpadMap.forEach(([id, dx, dy]) => {
+            const btn = document.getElementById(id);
+            btn.addEventListener('touchstart', e => {
+                e.preventDefault();
+                btn.classList.add('pressed');
+                setDirection(dx, dy);
+            }, { passive: false });
+            btn.addEventListener('touchend', () => btn.classList.remove('pressed'));
+            btn.addEventListener('mousedown', () => setDirection(dx, dy));
+        });
+
+        // Keyboard
+        document.addEventListener('keydown', e => {
+            const map = {
+                'ArrowUp':    [0, -1],
+                'ArrowDown':  [0,  1],
+                'ArrowLeft':  [-1, 0],
+                'ArrowRight': [1,  0]
+            };
+            if (map[e.key]) { e.preventDefault(); setDirection(...map[e.key]); }
+        });
+
+        // Swipe on canvas
+        let tx = 0, ty = 0;
+        canvas.addEventListener('touchstart', e => {
+            tx = e.touches[0].clientX;
+            ty = e.touches[0].clientY;
+            e.preventDefault();
+        }, { passive: false });
+
+        canvas.addEventListener('touchend', e => {
+            const dx = e.changedTouches[0].clientX - tx;
+            const dy = e.changedTouches[0].clientY - ty;
+            if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return; // ignore taps
+            if (Math.abs(dx) > Math.abs(dy)) {
+                setDirection(dx > 0 ? 1 : -1, 0);
+            } else {
+                setDirection(0, dy > 0 ? 1 : -1);
+            }
+            e.preventDefault();
+        }, { passive: false });
+    }
+
+    // ─── Score Submission ────────────────────────────────────────────────────
+    async function submitScore() {
+        if (!userProfile) return;
+
+        const payload = {
+            gameType:    "snake",
+            groupId:     liffContext?.groupId || "personal_chat",
+            userId:      userProfile.userId,
+            userName:    userProfile.displayName,
+            score:       score,
+            isAscending: false,
+            extraData:   JSON.stringify({ time: new Date().toISOString(), length: snake.length })
+        };
+
+        try {
+            const res    = await fetch(API_URL, {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify(payload)
+            });
+            const result = await res.json();
+            if (result.success) renderLeaderboard(result.data);
+        } catch (err) {
+            console.error("上傳分數失敗", err);
+        }
+    }
+
+    // ─── Leaderboard ─────────────────────────────────────────────────────────
+    function renderLeaderboard(data) {
+        const list = document.getElementById('rank-list');
+        list.innerHTML = data.map(item => `
+            <div class="rank-item ${item.userName === userProfile?.displayName ? 'my-rank' : ''}">
+                <div class="rank-number">${item.rank}</div>
+                <div class="rank-name">${item.userName}</div>
+                <div class="rank-score">${item.score} 分</div>
+            </div>
+        `).join('');
+        document.getElementById('leaderboard-section').style.display = 'block';
+        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    }
+
+    async function shareResult() {
+        if (!liff.isApiAvailable('shareTargetPicker')) return;
+        await liff.shareTargetPicker([{
+            type: "text",
+            text: `🐍 貪食蛇挑戰成功！\n玩家：${userProfile.displayName}\n得分：${score} 分\n快來挑戰我的排名吧！`
+        }]);
+    }
+
+    // ─── Boot ────────────────────────────────────────────────────────────────
+    initLiff();
+</script>
+</body>
+</html>
