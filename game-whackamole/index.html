@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>打地鼠挑戰賽</title>
+    <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <style>
+        :root { --line-green: #00b900; --bg: #f4f7f6; --panel: #ffffff; }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: -apple-system, sans-serif;
+            background: var(--bg);
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            width: 100%;
+            max-width: 420px;
+            background: var(--panel);
+            border-radius: 16px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+            padding: 18px;
+            text-align: center;
+        }
+        .status-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 12px 0 14px;
+            font-size: 14px;
+            color: #555;
+            gap: 10px;
+        }
+        .pill {
+            background: #eef7ee;
+            color: #2f6b2f;
+            border-radius: 999px;
+            padding: 6px 10px;
+            font-weight: bold;
+            font-size: 13px;
+        }
+        .mole-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 8px;
+        }
+        .hole {
+            border: none;
+            border-radius: 14px;
+            aspect-ratio: 1;
+            background: #d8e6d8;
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            transition: transform 0.08s, background 0.08s;
+        }
+        .hole:active { transform: scale(0.96); }
+        .hole::before {
+            content: "";
+            position: absolute;
+            inset: 10px;
+            border-radius: 50%;
+            background: #7f8c8d;
+            opacity: 0.35;
+        }
+        .hole.active {
+            background: #fff5d8;
+            box-shadow: inset 0 0 0 2px #ffd166;
+        }
+        .hole.active::after {
+            content: "🐹";
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 34px;
+        }
+
+        .overlay {
+            margin-top: 14px;
+            background: #f8fbf8;
+            border: 1px solid #e6efe6;
+            border-radius: 12px;
+            padding: 14px;
+            display: none;
+        }
+
+        #leaderboard-section {
+            margin-top: 20px;
+            display: none;
+            text-align: left;
+            border-top: 2px solid #eee;
+            padding-top: 14px;
+        }
+        .rank-item { display: flex; align-items: center; padding: 10px; border-bottom: 1px solid #f0f0f0; }
+        .rank-number { width: 30px; font-weight: bold; color: var(--line-green); }
+        .rank-name { flex: 1; }
+        .rank-score { font-weight: bold; color: #e67e22; }
+        .my-rank { background: #fff9db !important; border-radius: 6px; }
+
+        .btn {
+            width: 100%;
+            border: none;
+            border-radius: 10px;
+            padding: 12px;
+            margin-top: 10px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .btn-primary { background: var(--line-green); color: white; font-weight: bold; }
+        .btn-share { background: #3b5998; color: white; }
+        .btn-lobby { background: #ecf0f1; color: #555; }
+        .hint { color: #888; font-size: 12px; margin-top: 8px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h2>🔨 打地鼠</h2>
+
+    <div class="status-row">
+        <div>玩家：<strong id="user-name">載入中...</strong></div>
+        <div class="pill">剩餘：<span id="time">30</span>s</div>
+        <div class="pill">分數：<span id="score">0</span></div>
+    </div>
+
+    <button class="btn btn-primary" id="start-btn" onclick="startGame()">開始遊戲</button>
+    <p class="hint">30 秒內盡量多打到地鼠</p>
+
+    <div class="mole-grid" id="mole-grid"></div>
+
+    <div class="overlay" id="result-overlay">
+        <h3 style="margin:0 0 6px;">⏰ 回合結束</h3>
+        <p style="margin:0;color:#555;">本局分數：<strong id="final-score">0</strong> 分</p>
+        <button class="btn btn-primary" onclick="startGame()">再玩一次</button>
+    </div>
+
+    <div id="leaderboard-section">
+        <h3 style="text-align:center;">🏆 本群 TOP 5</h3>
+        <div id="rank-list"></div>
+        <button class="btn btn-share" onclick="shareResult()">分享戰績到 LINE</button>
+        <button class="btn btn-lobby" onclick="window.location.href='../'">← 返回大廳</button>
+    </div>
+</div>
+
+<script>
+    const LIFF_ID = "2009635482-zInmjHOw";
+    const API_URL = "https://cloudson.asuscomm.com:10666/submitscore";
+    const GAME_TIME = 30;
+
+    let userProfile = null;
+    let liffContext = null;
+
+    let score = 0;
+    let remain = GAME_TIME;
+    let activeIndex = -1;
+    let isRunning = false;
+    let timerId = null;
+    let moleId = null;
+    let submitted = false;
+
+    function buildGrid() {
+        const grid = document.getElementById('mole-grid');
+        grid.innerHTML = '';
+        for (let i = 0; i < 9; i++) {
+            const btn = document.createElement('button');
+            btn.className = 'hole';
+            btn.dataset.index = i;
+            btn.addEventListener('click', () => hitMole(i));
+            grid.appendChild(btn);
+        }
+    }
+
+    function setActiveHole(nextIndex) {
+        const holes = Array.from(document.querySelectorAll('.hole'));
+        holes.forEach(h => h.classList.remove('active'));
+        activeIndex = nextIndex;
+        if (activeIndex >= 0) holes[activeIndex].classList.add('active');
+    }
+
+    function tickMole() {
+        if (!isRunning) return;
+        const next = Math.floor(Math.random() * 9);
+        setActiveHole(next);
+    }
+
+    function hitMole(index) {
+        if (!isRunning) return;
+        if (index !== activeIndex) return;
+        score += 1;
+        document.getElementById('score').innerText = score;
+        setActiveHole(-1);
+        setTimeout(tickMole, 60);
+    }
+
+    function startGame() {
+        submitted = false;
+        isRunning = true;
+        score = 0;
+        remain = GAME_TIME;
+        document.getElementById('score').innerText = score;
+        document.getElementById('time').innerText = remain;
+        document.getElementById('start-btn').style.display = 'none';
+        document.getElementById('result-overlay').style.display = 'none';
+        document.getElementById('leaderboard-section').style.display = 'none';
+
+        if (timerId) clearInterval(timerId);
+        if (moleId) clearInterval(moleId);
+
+        tickMole();
+        moleId = setInterval(tickMole, 650);
+        timerId = setInterval(() => {
+            remain -= 1;
+            document.getElementById('time').innerText = remain;
+            if (remain <= 0) endGame();
+        }, 1000);
+    }
+
+    function endGame() {
+        if (!isRunning) return;
+        isRunning = false;
+        clearInterval(timerId);
+        clearInterval(moleId);
+        setActiveHole(-1);
+        document.getElementById('final-score').innerText = score;
+        document.getElementById('result-overlay').style.display = 'block';
+        submitScore();
+    }
+
+    function buildShareText() {
+        return [
+            '==== 🔨 打地鼠挑戰賽 ==== ',
+            `玩家｜${userProfile?.displayName || '玩家'}`,
+            `得分｜${score} 分`,
+            '',
+            '我剛完成一局，來挑戰我的反應速度！',
+            '#LIFFGameLobby'
+        ].join('\n');
+    }
+
+    async function trySendResultMessage() {
+        try {
+            if (!userProfile) return { ok: false, reason: '尚未登入 LINE，無法自動分享。' };
+            if (typeof liff === 'undefined') return { ok: false, reason: 'LIFF SDK 未載入。' };
+            if (!liff.isInClient()) return { ok: false, reason: '請在 LINE App 內開啟。' };
+            if (typeof liff.sendMessages !== 'function') return { ok: false, reason: '此情境不支援自動分享。' };
+            await liff.sendMessages([{ type: 'text', text: buildShareText() }]);
+            return { ok: true };
+        } catch (err) {
+            const detail = err?.message ? `（${err.message}）` : '';
+            return { ok: false, reason: `自動分享失敗${detail}` };
+        }
+    }
+
+    async function submitScore() {
+        if (submitted || !userProfile) return;
+        submitted = true;
+
+        const shareResult = await Promise.race([
+            trySendResultMessage(),
+            new Promise(resolve => setTimeout(() => resolve({ ok: false, reason: '分享逾時，已略過。' }), 2800))
+        ]);
+        if (!shareResult.ok) console.warn(shareResult.reason);
+
+        const payload = {
+            gameType: "whack_a_mole",
+            groupId: liffContext?.groupId || "personal_chat",
+            userId: userProfile.userId,
+            userName: userProfile.displayName,
+            score: score,
+            isAscending: false,
+            extraData: JSON.stringify({ time: new Date().toISOString(), duration: GAME_TIME })
+        };
+
+        try {
+            const res = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const result = await res.json();
+            if (result.success) renderLeaderboard(result.data);
+        } catch (err) {
+            console.error('上傳分數失敗', err);
+        }
+    }
+
+    function renderLeaderboard(data) {
+        const list = document.getElementById('rank-list');
+        list.innerHTML = data.map(item => `
+            <div class="rank-item ${item.userName === userProfile?.displayName ? 'my-rank' : ''}">
+                <div class="rank-number">${item.rank}</div>
+                <div class="rank-name">${item.userName}</div>
+                <div class="rank-score">${item.score} 分</div>
+            </div>
+        `).join('');
+        document.getElementById('leaderboard-section').style.display = 'block';
+        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    }
+
+    async function shareResult() {
+        if (!userProfile) {
+            alert('尚未登入 LINE，無法分享。');
+            return;
+        }
+
+        const message = { type: 'text', text: buildShareText() };
+
+        try {
+            if (typeof liff !== 'undefined' && liff.isInClient() && typeof liff.sendMessages === 'function') {
+                await liff.sendMessages([message]);
+                return;
+            }
+        } catch (err) {
+            console.warn('sendMessages 失敗', err);
+        }
+
+        try {
+            if (typeof liff !== 'undefined' && typeof liff.shareTargetPicker === 'function') {
+                const picked = await liff.shareTargetPicker([message]);
+                if (picked === false) alert('你已取消分享。');
+                return;
+            }
+        } catch (err) {
+            const detail = err?.message ? `（${err.message}）` : '';
+            alert(`手動分享失敗${detail}`);
+            return;
+        }
+
+        alert('目前環境不支援分享，請在 LINE App 內開啟。');
+    }
+
+    async function initLiff() {
+        try {
+            await liff.init({ liffId: LIFF_ID });
+            if (!liff.isLoggedIn()) {
+                liff.login();
+                return;
+            }
+            userProfile = await liff.getProfile();
+            liffContext = liff.getContext();
+            document.getElementById('user-name').innerText = userProfile.displayName;
+        } catch (err) {
+            console.error('LIFF Init Failed', err);
+            document.getElementById('user-name').innerText = '訪客';
+        }
+        buildGrid();
+    }
+
+    initLiff();
+</script>
+</body>
+</html>
