@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>2048 挑戰賽</title>
+    <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <style>
+        :root { --line-green: #00b900; }
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, sans-serif;
+            background: #f4f7f6;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            max-width: 400px;
+            width: 100%;
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        /* ─── Header ─── */
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 14px;
+        }
+        .score-box {
+            background: #f0f0f0;
+            border-radius: 8px;
+            padding: 6px 14px;
+            text-align: center;
+            min-width: 72px;
+        }
+        .score-label { font-size: 11px; color: #999; font-weight: bold; }
+        .score-value { font-size: 18px; font-weight: bold; color: #333; }
+
+        /* ─── Board ─── */
+        .board-wrapper {
+            background: #bbada0;
+            border-radius: 10px;
+            padding: 10px;
+            display: inline-block;
+            width: 100%;
+        }
+        .board-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+        }
+        .cell {
+            aspect-ratio: 1;
+            border-radius: 6px;
+            background: rgba(238,228,218,0.35);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 28px;
+            transition: background 0.08s, transform 0.08s;
+            user-select: none;
+        }
+
+        /* ─── Tile colours ─── */
+        .t2    { background: #eee4da; color: #776e65; }
+        .t4    { background: #ede0c8; color: #776e65; }
+        .t8    { background: #f2b179; color: #fff; }
+        .t16   { background: #f59563; color: #fff; }
+        .t32   { background: #f67c5f; color: #fff; }
+        .t64   { background: #f65e3b; color: #fff; }
+        .t128  { background: #edcf72; color: #fff; font-size: 22px; }
+        .t256  { background: #edcc61; color: #fff; font-size: 22px; }
+        .t512  { background: #edc850; color: #fff; font-size: 22px; }
+        .t1024 { background: #edc53f; color: #fff; font-size: 18px; }
+        .t2048 { background: #edc22e; color: #fff; font-size: 18px; }
+        .t-big { background: #3c3a32; color: #fff; font-size: 14px; }
+
+        /* ─── Overlay ─── */
+        .board-container { position: relative; }
+        .overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(238,228,218,0.82);
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        .overlay h3 { font-size: 28px; margin: 0; }
+        .overlay p  { margin: 0; color: #555; font-size: 14px; }
+        .overlay-btn {
+            background: var(--line-green);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            padding: 12px 32px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 4px;
+        }
+
+        /* ─── Buttons ─── */
+        .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; margin-top: 10px; }
+        .btn-primary { background: var(--line-green); color: white; }
+        .btn-share   { background: #3b5998; color: white; }
+        .btn-lobby   { background: #ecf0f1; color: #555; }
+
+        .hint { font-size: 12px; color: #aaa; margin-top: 10px; }
+
+        /* ─── Leaderboard ─── */
+        #leaderboard-section {
+            margin-top: 22px;
+            display: none;
+            border-top: 2px solid #eee;
+            padding-top: 15px;
+            text-align: left;
+        }
+        .rank-item  { display: flex; align-items: center; padding: 10px; border-bottom: 1px solid #f0f0f0; }
+        .rank-number { width: 30px; font-weight: bold; color: var(--line-green); }
+        .rank-name   { flex: 1; }
+        .rank-score  { font-weight: bold; color: #e67e22; }
+        .my-rank     { background: #fff9db !important; border-radius: 5px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>🔢 2048</h2>
+
+    <div class="status-bar">
+        <div style="font-size:13px;color:#888;text-align:left;">
+            玩家<br><strong id="user-name" style="color:#333;font-size:14px;">載入中...</strong>
+        </div>
+        <div style="display:flex;gap:10px;">
+            <div class="score-box">
+                <div class="score-label">分數</div>
+                <div class="score-value" id="score">0</div>
+            </div>
+            <div class="score-box">
+                <div class="score-label">最佳</div>
+                <div class="score-value" id="best-score">0</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="board-container">
+        <div class="board-wrapper">
+            <div class="board-grid" id="board-grid"></div>
+        </div>
+        <!-- Game over / Win overlay -->
+        <div class="overlay" id="game-overlay" style="display:none;">
+            <h3 id="overlay-title">遊戲結束</h3>
+            <p id="overlay-msg">最終分數：0 分</p>
+            <button class="overlay-btn" onclick="restartGame()">再玩一次</button>
+        </div>
+    </div>
+
+    <p class="hint">滑動畫面移動方塊</p>
+
+    <div id="leaderboard-section">
+        <h3 style="text-align:center;">🏆 本群 TOP 5</h3>
+        <div id="rank-list"></div>
+        <button class="btn btn-share" onclick="shareResult()">分享戰績到 LINE</button>
+        <button class="btn btn-primary" onclick="restartGame()">重新開始</button>
+        <button class="btn btn-lobby" onclick="window.location.href='../'">← 返回大廳</button>
+    </div>
+</div>
+
+<script>
+    const LIFF_ID = "2009635482-zInmjHOw"; // 與 memory_flip 共用
+    const API_URL = "https://cloudson.asuscomm.com:10666/submitscore";
+    const SIZE = 4;
+
+    let board, score, bestScore, moved, gameOver, won;
+    let userProfile = null;
+    let liffContext  = null;
+    let submitted    = false;
+
+    // ─── LIFF ────────────────────────────────────────────────────────────────
+    async function initLiff() {
+        try {
+            await liff.init({ liffId: LIFF_ID });
+            if (!liff.isLoggedIn()) { liff.login(); return; }
+            userProfile = await liff.getProfile();
+            liffContext  = liff.getContext();
+            document.getElementById('user-name').innerText = userProfile.displayName;
+        } catch (e) {
+            console.error("LIFF Init Failed", e);
+            document.getElementById('user-name').innerText = '訪客';
+        }
+        initGame();
+    }
+
+    // ─── Game Init ───────────────────────────────────────────────────────────
+    function initGame() {
+        buildGrid();
+        restartGame();
+        setupSwipe();
+        document.addEventListener('keydown', onKey);
+    }
+
+    function buildGrid() {
+        const grid = document.getElementById('board-grid');
+        grid.innerHTML = '';
+        for (let i = 0; i < SIZE * SIZE; i++) {
+            const cell = document.createElement('div');
+            cell.className = 'cell';
+            cell.id = `c${i}`;
+            grid.appendChild(cell);
+        }
+    }
+
+    function restartGame() {
+        board     = Array.from({ length: SIZE }, () => Array(SIZE).fill(0));
+        score     = 0;
+        gameOver  = false;
+        won       = false;
+        submitted = false;
+        document.getElementById('score').innerText = '0';
+        document.getElementById('game-overlay').style.display = 'none';
+        document.getElementById('leaderboard-section').style.display = 'none';
+        addRandom(); addRandom();
+        render();
+    }
+
+    // ─── Core Logic ──────────────────────────────────────────────────────────
+    function addRandom() {
+        const empty = [];
+        for (let r = 0; r < SIZE; r++)
+            for (let c = 0; c < SIZE; c++)
+                if (board[r][c] === 0) empty.push([r, c]);
+        if (!empty.length) return;
+        const [r, c] = empty[Math.floor(Math.random() * empty.length)];
+        board[r][c] = Math.random() < 0.9 ? 2 : 4;
+    }
+
+    function slideRow(row) {
+        // Remove zeros
+        let nums = row.filter(n => n !== 0);
+        let gained = 0;
+        // Merge
+        for (let i = 0; i < nums.length - 1; i++) {
+            if (nums[i] === nums[i + 1]) {
+                nums[i] *= 2;
+                gained += nums[i];
+                nums[i + 1] = 0;
+            }
+        }
+        nums = nums.filter(n => n !== 0);
+        while (nums.length < SIZE) nums.push(0);
+        return { row: nums, gained };
+    }
+
+    function moveLeft() {
+        let gained = 0;
+        moved = false;
+        for (let r = 0; r < SIZE; r++) {
+            const { row, gained: g } = slideRow(board[r]);
+            if (row.join() !== board[r].join()) moved = true;
+            board[r] = row;
+            gained += g;
+        }
+        return gained;
+    }
+
+    function rotateBoard(times) {
+        for (let t = 0; t < times; t++) {
+            const next = Array.from({ length: SIZE }, () => Array(SIZE).fill(0));
+            for (let r = 0; r < SIZE; r++)
+                for (let c = 0; c < SIZE; c++)
+                    next[c][SIZE - 1 - r] = board[r][c];
+            board = next;
+        }
+    }
+
+    function doMove(dir) {
+        if (gameOver) return;
+        const rotMap = { left: 0, right: 2, up: 3, down: 1 };
+        const backMap = { left: 0, right: 2, up: 1, down: 3 };
+        rotateBoard(rotMap[dir]);
+        const gained = moveLeft();
+        rotateBoard(backMap[dir]);
+        if (!moved) return;
+        score += gained;
+        document.getElementById('score').innerText = score;
+        if (score > bestScore) {
+            bestScore = score;
+            document.getElementById('best-score').innerText = bestScore;
+        }
+        addRandom();
+        render();
+        checkEnd();
+    }
+
+    // ─── Render ──────────────────────────────────────────────────────────────
+    function tileClass(val) {
+        if (!val) return '';
+        if (val === 2048) return 't2048';
+        if (val > 2048)  return 't-big';
+        return 't' + val;
+    }
+
+    function render() {
+        for (let r = 0; r < SIZE; r++) {
+            for (let c = 0; c < SIZE; c++) {
+                const val  = board[r][c];
+                const cell = document.getElementById(`c${r * SIZE + c}`);
+                cell.className = 'cell' + (val ? ' ' + tileClass(val) : '');
+                cell.innerText = val || '';
+            }
+        }
+    }
+
+    // ─── End Condition ───────────────────────────────────────────────────────
+    function checkEnd() {
+        // Win check (only trigger once)
+        if (!won && board.some(row => row.includes(2048))) {
+            won = true;
+            showOverlay('🎉 達成 2048！', `分數：${score} 分`);
+            submitScore(); return;
+        }
+        // Game-over check
+        if (board.flat().includes(0)) return;
+        for (let r = 0; r < SIZE; r++) {
+            for (let c = 0; c < SIZE; c++) {
+                if (c < SIZE - 1 && board[r][c] === board[r][c + 1]) return;
+                if (r < SIZE - 1 && board[r][c] === board[r + 1][c]) return;
+            }
+        }
+        gameOver = true;
+        showOverlay('💀 遊戲結束', `最終分數：${score} 分`);
+        submitScore();
+    }
+
+    function showOverlay(title, msg) {
+        document.getElementById('overlay-title').innerText = title;
+        document.getElementById('overlay-msg').innerText   = msg;
+        document.getElementById('game-overlay').style.display = 'flex';
+    }
+
+    // ─── Controls ────────────────────────────────────────────────────────────
+    function onKey(e) {
+        const map = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' };
+        if (map[e.key]) { e.preventDefault(); doMove(map[e.key]); }
+    }
+
+    function setupSwipe() {
+        const el = document.querySelector('.board-container');
+        let sx = 0, sy = 0;
+        el.addEventListener('touchstart', e => {
+            sx = e.touches[0].clientX;
+            sy = e.touches[0].clientY;
+            e.preventDefault();
+        }, { passive: false });
+        el.addEventListener('touchend', e => {
+            const dx = e.changedTouches[0].clientX - sx;
+            const dy = e.changedTouches[0].clientY - sy;
+            if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+            if (Math.abs(dx) > Math.abs(dy))
+                doMove(dx > 0 ? 'right' : 'left');
+            else
+                doMove(dy > 0 ? 'down' : 'up');
+            e.preventDefault();
+        }, { passive: false });
+    }
+
+    // ─── Score Submit ────────────────────────────────────────────────────────
+    async function submitScore() {
+        if (submitted || !userProfile) return;
+        submitted = true;
+
+        const payload = {
+            gameType:    "2048",
+            groupId:     liffContext?.groupId || "personal_chat",
+            userId:      userProfile.userId,
+            userName:    userProfile.displayName,
+            score:       score,
+            isAscending: false,
+            extraData:   JSON.stringify({ won, time: new Date().toISOString() })
+        };
+
+        try {
+            const res    = await fetch(API_URL, {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify(payload)
+            });
+            const result = await res.json();
+            if (result.success) renderLeaderboard(result.data);
+        } catch (err) {
+            console.error("上傳分數失敗", err);
+        }
+    }
+
+    // ─── Leaderboard ─────────────────────────────────────────────────────────
+    function renderLeaderboard(data) {
+        const list = document.getElementById('rank-list');
+        list.innerHTML = data.map(item => `
+            <div class="rank-item ${item.userName === userProfile?.displayName ? 'my-rank' : ''}">
+                <div class="rank-number">${item.rank}</div>
+                <div class="rank-name">${item.userName}</div>
+                <div class="rank-score">${item.score} 分</div>
+            </div>
+        `).join('');
+        document.getElementById('leaderboard-section').style.display = 'block';
+        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    }
+
+    async function shareResult() {
+        if (!liff.isApiAvailable('shareTargetPicker')) return;
+        const tile = board.flat().reduce((a, b) => Math.max(a, b), 0);
+        await liff.shareTargetPicker([{
+            type: "text",
+            text: `🔢 2048 挑戰${won ? '成功' : '結束'}！\n玩家：${userProfile.displayName}\n得分：${score} 分　最高磚：${tile}\n快來挑戰我的排名吧！`
+        }]);
+    }
+
+    initLiff();
+</script>
+</body>
+</html>
