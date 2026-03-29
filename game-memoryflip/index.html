@@ -169,6 +169,42 @@
         ].join('\n');
     }
 
+    function buildShareFlexMessage() {
+        return {
+            type: 'flex',
+            altText: `🧩 翻牌戰績｜${userProfile?.displayName || '玩家'}｜${moves} 步`,
+            contents: {
+                type: 'bubble',
+                body: {
+                    type: 'box',
+                    layout: 'vertical',
+                    spacing: 'md',
+                    contents: [
+                        { type: 'text', text: '🏆 翻牌大賽結算', weight: 'bold', size: 'xl', color: '#00B900' },
+                        { type: 'text', text: `玩家：${userProfile?.displayName || '玩家'}`, size: 'md', color: '#333333' },
+                        { type: 'text', text: `成績：${moves} 步完成`, weight: 'bold', size: 'xl', color: '#1F2D3D' }
+                    ]
+                },
+                footer: {
+                    type: 'box',
+                    layout: 'vertical',
+                    contents: [
+                        {
+                            type: 'button',
+                            style: 'primary',
+                            color: '#00B900',
+                            action: {
+                                type: 'uri',
+                                label: '挑戰他！',
+                                uri: `https://liff.line.me/${LIFF_ID}`
+                            }
+                        }
+                    ]
+                }
+            }
+        };
+    }
+
     async function trySendResultMessage() {
         if (!userProfile) return { ok: false, reason: '尚未登入 LINE，無法自動分享。' };
         if (typeof liff === 'undefined') return { ok: false, reason: 'LIFF SDK 未載入。' };
@@ -176,13 +212,15 @@
         if (typeof liff.sendMessages !== 'function') {
             return { ok: false, reason: '目前聊天情境不支援自動分享，請按下方按鈕手動分享。' };
         }
-        const message = {
-            type: 'text',
-            text: buildShareText()
-        };
         try {
-            await liff.sendMessages([message]);
-            return { ok: true };
+            try {
+                await liff.sendMessages([buildShareFlexMessage()]);
+                return { ok: true };
+            } catch (flexErr) {
+                console.warn('Flex 自動分享失敗，改送文字', flexErr);
+                await liff.sendMessages([{ type: 'text', text: buildShareText() }]);
+                return { ok: true };
+            }
         } catch (err) {
             const detail = err?.message ? `（${err.message}）` : '';
             console.warn('sendMessages 失敗', err);
@@ -257,14 +295,14 @@
             return;
         }
 
-        const message = {
-            type: "text",
-            text: buildShareText()
-        };
-
         try {
             if (typeof liff !== 'undefined' && liff.isInClient() && typeof liff.sendMessages === 'function') {
-                await liff.sendMessages([message]);
+                try {
+                    await liff.sendMessages([buildShareFlexMessage()]);
+                } catch (flexErr) {
+                    console.warn('手動 Flex 失敗，改送文字', flexErr);
+                    await liff.sendMessages([{ type: 'text', text: buildShareText() }]);
+                }
                 showFlowNotice('已手動分享戰績到 LINE。');
                 return;
             }
@@ -274,7 +312,13 @@
 
         try {
             if (typeof liff !== 'undefined' && typeof liff.shareTargetPicker === 'function') {
-                const picked = await liff.shareTargetPicker([message]);
+                let picked;
+                try {
+                    picked = await liff.shareTargetPicker([buildShareFlexMessage()]);
+                } catch (flexErr) {
+                    console.warn('shareTargetPicker Flex 失敗，改送文字', flexErr);
+                    picked = await liff.shareTargetPicker([{ type: 'text', text: buildShareText() }]);
+                }
                 if (picked === false) {
                     alert('你已取消分享。');
                     return;
