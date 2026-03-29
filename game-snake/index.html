@@ -458,7 +458,7 @@
             if (!userProfile) return { ok: false, reason: '尚未登入 LINE，無法自動分享。' };
             if (typeof liff === 'undefined') return { ok: false, reason: 'LIFF SDK 未載入。' };
             if (!liff.isInClient()) return { ok: false, reason: '請在 LINE App 內開啟，才可自動分享。' };
-            if (!liff.isApiAvailable('sendMessages')) {
+            if (typeof liff.sendMessages !== 'function') {
                 return { ok: false, reason: '目前聊天情境不支援自動分享，請按下方按鈕手動分享。' };
             }
 
@@ -539,11 +539,43 @@
     }
 
     async function shareResult() {
-        if (!liff.isApiAvailable('shareTargetPicker')) return;
-        await liff.shareTargetPicker([{
+        if (!userProfile) {
+            alert('尚未登入 LINE，無法分享。');
+            return;
+        }
+
+        const message = {
             type: "text",
             text: `🐍 貪食蛇挑戰成功！\n玩家：${userProfile.displayName}\n得分：${score} 分\n快來挑戰我的排名吧！`
-        }]);
+        };
+
+        try {
+            if (typeof liff !== 'undefined' && liff.isInClient() && typeof liff.sendMessages === 'function') {
+                await liff.sendMessages([message]);
+                showFlowNotice('已手動分享戰績到 LINE。');
+                return;
+            }
+        } catch (err) {
+            console.warn('手動 sendMessages 失敗', err);
+        }
+
+        try {
+            if (typeof liff !== 'undefined' && typeof liff.shareTargetPicker === 'function') {
+                const picked = await liff.shareTargetPicker([message]);
+                if (picked === false) {
+                    alert('你已取消分享。');
+                    return;
+                }
+                showFlowNotice('已手動分享戰績到 LINE。');
+                return;
+            }
+        } catch (err) {
+            const detail = err?.message ? `（${err.message}）` : '';
+            alert(`手動分享失敗${detail}`);
+            return;
+        }
+
+        alert('目前環境不支援分享，請在 LINE App 內開啟。');
     }
 
     // ─── Boot ────────────────────────────────────────────────────────────────
