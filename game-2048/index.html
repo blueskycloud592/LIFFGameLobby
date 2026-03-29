@@ -133,6 +133,32 @@
         .rank-name   { flex: 1; }
         .rank-score  { font-weight: bold; color: #e67e22; }
         .my-rank     { background: #fff9db !important; border-radius: 5px; }
+
+        /* ─── How to play ─── */
+        .how-to-play {
+            margin-top: 20px;
+            background: #fafafa;
+            border: 1px solid #eee;
+            border-radius: 10px;
+            padding: 14px 16px;
+            text-align: left;
+            font-size: 13px;
+            color: #555;
+            line-height: 1.8;
+        }
+        .how-to-play h4 {
+            margin: 0 0 8px;
+            font-size: 14px;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .how-to-play ul {
+            margin: 0;
+            padding-left: 18px;
+        }
+        .how-to-play li { margin-bottom: 4px; }
     </style>
 </head>
 <body>
@@ -169,6 +195,19 @@
     </div>
 
     <p class="hint">滑動畫面移動方塊</p>
+
+    <!-- 玩法說明 -->
+    <div class="how-to-play">
+        <h4>📖 玩法說明</h4>
+        <ul>
+            <li>在 4×4 的格子上，<strong>上下左右滑動</strong>（或按方向鍵）移動所有方塊。</li>
+            <li>兩個<strong>數字相同</strong>的方塊碰在一起時會<strong>合併</strong>，數字加倍，並獲得等同數值的分數。</li>
+            <li>每次移動後，空格會隨機出現一個 <strong>2</strong> 或 <strong>4</strong>。</li>
+            <li>成功合併出 <strong>2048</strong> 的方塊即為勝利！</li>
+            <li>若棋盤填滿且無法再合併，遊戲<strong>結束</strong>。</li>
+            <li>遊戲結束後分數將自動上傳至<strong>本群排行榜</strong>。</li>
+        </ul>
+    </div>
 
     <div id="leaderboard-section">
         <h3 style="text-align:center;">🏆 本群 TOP 5</h3>
