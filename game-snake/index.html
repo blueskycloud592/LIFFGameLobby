@@ -453,6 +453,18 @@
     }
 
     // ─── Score Submission ────────────────────────────────────────────────────
+    function buildShareText() {
+        return [
+            '==== 🐍 貪食蛇挑戰賽 ==== ',
+            `玩家｜${userProfile?.displayName || '玩家'}`,
+            `得分｜${score} 分`,
+            `長度｜${snake?.length || 0}`,
+            '',
+            '我剛完成一局，來挑戰我的排名！',
+            '#LIFFGameLobby'
+        ].join('\n');
+    }
+
     async function trySendResultMessage() {
         try {
             if (!userProfile) return { ok: false, reason: '尚未登入 LINE，無法自動分享。' };
@@ -464,7 +476,7 @@
 
             const message = {
                 type: 'text',
-                text: `🐍 貪食蛇挑戰結束！\n玩家：${userProfile.displayName}\n得分：${score} 分\n快來挑戰我的排名吧！`
+                text: buildShareText()
             };
 
             await liff.sendMessages([message]);
@@ -546,7 +558,7 @@
 
         const message = {
             type: "text",
-            text: `🐍 貪食蛇挑戰成功！\n玩家：${userProfile.displayName}\n得分：${score} 分\n快來挑戰我的排名吧！`
+            text: buildShareText()
         };
 
         try {

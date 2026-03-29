@@ -157,6 +157,18 @@
     }
 
     // --- 3. 處理勝利與上傳 ---
+    function buildShareText() {
+        return [
+            '==== 🧩 記憶翻牌挑戰賽 ==== ',
+            `玩家｜${userProfile?.displayName || '玩家'}`,
+            `成績｜${moves} 步`,
+            '結果｜完成配對 ✅',
+            '',
+            '我剛通關，來挑戰我的步數！',
+            '#LIFFGameLobby'
+        ].join('\n');
+    }
+
     async function trySendResultMessage() {
         if (!userProfile) return { ok: false, reason: '尚未登入 LINE，無法自動分享。' };
         if (typeof liff === 'undefined') return { ok: false, reason: 'LIFF SDK 未載入。' };
@@ -166,7 +178,7 @@
         }
         const message = {
             type: 'text',
-            text: `🎮 記憶翻牌挑戰成功！\n玩家：${userProfile.displayName}\n成績：${moves} 步\n快來挑戰我的排名吧！`
+            text: buildShareText()
         };
         try {
             await liff.sendMessages([message]);
@@ -247,7 +259,7 @@
 
         const message = {
             type: "text",
-            text: `🎮 記憶翻牌挑戰成功！\n玩家：${userProfile.displayName}\n成績：${moves} 步\n快來挑戰我的排名吧！`
+            text: buildShareText()
         };
 
         try {
