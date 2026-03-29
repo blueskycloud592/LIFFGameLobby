@@ -169,27 +169,29 @@
                 await liff.sendMessages([message]);
                 return { ok: true };
             } catch (err) {
-                console.warn('sendMessages 失敗，改用 shareTargetPicker', err);
+                console.warn('sendMessages 失敗', err);
+                return { ok: false, reason: '自動分享失敗，請按下方按鈕手動分享。' };
             }
         }
 
-        if (liff.isApiAvailable('shareTargetPicker')) {
-            try {
-                const picked = await liff.shareTargetPicker([message]);
-                if (picked === false) return { ok: false, reason: '你已取消分享。' };
-                return { ok: true };
-            } catch (err) {
-                console.warn('shareTargetPicker 失敗', err);
-            }
-        }
-
-        return { ok: false, reason: '目前環境不支援自動分享，請改按下方「分享戰績到 LINE」。' };
+        return { ok: false, reason: '目前聊天情境不支援自動分享，請按下方按鈕手動分享。' };
     }
 
     async function finishGameFlow() {
         if (gameFinished) return;
         gameFinished = true;
-        const shareResult = await trySendResultMessage();
+        showFlowNotice('結算中：正在嘗試自動分享...');
+        let shareResult;
+        try {
+            shareResult = await Promise.race([
+                trySendResultMessage(),
+                new Promise(resolve => setTimeout(() => resolve({ ok: false, reason: '分享逾時，已略過自動分享。' }), 3500))
+            ]);
+        } catch (err) {
+            console.warn('分享流程例外', err);
+            shareResult = { ok: false, reason: '分享流程異常，已略過自動分享。' };
+        }
+
         if (!shareResult.ok) {
             showFlowNotice(`自動分享未送出：${shareResult.reason}`);
         } else {
