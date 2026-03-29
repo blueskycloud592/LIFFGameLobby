@@ -391,6 +391,17 @@
         document.getElementById('game-overlay').style.display = 'flex';
     }
 
+    function showFlowNotice(msg) {
+        const node = document.createElement('div');
+        node.className = 'hint';
+        node.style.marginTop = '8px';
+        node.style.color = '#666';
+        node.innerText = msg;
+        const container = document.querySelector('.container');
+        container.insertBefore(node, container.firstChild.nextSibling);
+        setTimeout(() => node.remove(), 5000);
+    }
+
     // ─── Controls ────────────────────────────────────────────────────────────
     function onKey(e) {
         const map = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' };
@@ -452,7 +463,9 @@
         if (submitted) return;
         const shareResult = await trySendResultMessage();
         if (!shareResult.ok) {
-            alert(`自動分享未送出：${shareResult.reason}\n已照常上傳排行榜。`);
+            showFlowNotice(`自動分享未送出：${shareResult.reason}`);
+        } else {
+            showFlowNotice('已自動分享戰績到 LINE。');
         }
         await submitScore();
     }

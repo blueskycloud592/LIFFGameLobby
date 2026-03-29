@@ -133,6 +133,17 @@
         }
     }
 
+    function showFlowNotice(msg) {
+        const node = document.createElement('div');
+        node.style.fontSize = '12px';
+        node.style.color = '#666';
+        node.style.marginTop = '8px';
+        node.innerText = msg;
+        const container = document.querySelector('.container');
+        container.insertBefore(node, container.firstChild.nextSibling);
+        setTimeout(() => node.remove(), 5000);
+    }
+
     // --- 3. 處理勝利與上傳 ---
     async function trySendResultMessage() {
         if (!userProfile) return { ok: false, reason: '尚未登入 LINE，無法自動分享。' };
@@ -168,7 +179,9 @@
         gameFinished = true;
         const shareResult = await trySendResultMessage();
         if (!shareResult.ok) {
-            alert(`自動分享未送出：${shareResult.reason}\n已照常上傳排行榜。`);
+            showFlowNotice(`自動分享未送出：${shareResult.reason}`);
+        } else {
+            showFlowNotice('已自動分享戰績到 LINE。');
         }
         await handleWin();
     }
